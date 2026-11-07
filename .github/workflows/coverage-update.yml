@@ -22,16 +22,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Test coverage generation
+        run: node --test tests/generate-coverage.test.mjs
       - name: Regenerate coverage doc
         run: node plugins/grc-engineer/scripts/generate-coverage.js
+      # Run even on a no-op: the action can close an obsolete bot PR.
       - name: Open PR if changed
         uses: peter-evans/create-pull-request@v6
         with:
+          add-paths: docs/FRAMEWORK-COVERAGE.md
           commit-message: 'docs: regenerate framework coverage'
           title: 'docs: regenerate FRAMEWORK-COVERAGE.md'
           body: |
             Weekly auto-regeneration of `docs/FRAMEWORK-COVERAGE.md` from SCF crosswalks + current plugin state.
             
-            This PR only opens when the generated content has actually changed.
+            This PR only opens when framework coverage content changes. The generated date is preserved on unchanged coverage.
           branch: bot/regenerate-coverage
           delete-branch: true

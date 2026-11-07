@@ -68,7 +68,7 @@ async function loadShippedPlugins() {
   return { plugins, unmapped };
 }
 
-function render({ scfFrameworks, shipped, generatedAt }) {
+export function render({ scfFrameworks, shipped, generatedAt }) {
   const { plugins, unmapped } = shipped;
   const lines = [];
 
@@ -197,6 +197,24 @@ function render({ scfFrameworks, shipped, generatedAt }) {
   return lines.join('\n');
 }
 
+// Ignore only the generated date, never framework rows, counts or metadata.
+// Keep the existing bytes (and mtime) on a no-op so weekly runs have no diff.
+function coverageContent(md) {
+  return md.replace(/^Last generated: \d{4}-\d{2}-\d{2}$/m, 'Last generated:');
+}
+
+export async function writeCoverage(out, md) {
+  let previous;
+  try {
+    previous = await fs.readFile(out, 'utf8');
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+  if (previous !== undefined && coverageContent(previous) === coverageContent(md)) return false;
+  await fs.writeFile(out, md);
+  return true;
+}
+
 async function main() {
   const opts = parseArgs(process.argv);
   if (opts.help) {
@@ -211,8 +229,8 @@ async function main() {
   ]);
 
   const md = render({ scfFrameworks, shipped, generatedAt: new Date() });
-  await fs.writeFile(opts.out, md);
-  console.log(`Wrote ${path.relative(REPO_ROOT, opts.out)}`);
+  const changed = await writeCoverage(opts.out, md);
+  console.log(`${changed ? 'Wrote' : 'Unchanged'} ${path.relative(REPO_ROOT, opts.out)}`);
   console.log(`  ${shipped.plugins.size} / ${scfFrameworks.length} frameworks with dedicated plugins`);
   if (shipped.unmapped.length > 0) {
     console.log(`  ${shipped.unmapped.length} shipped plugins without SCF mapping`);
